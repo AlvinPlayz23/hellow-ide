@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: #2b2b2b;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.font-mono-jb {
+  font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-feature-settings: "liga" 0;
+}
+
+/* ---------- Darcula syntax token colors ---------- */
+.tok-keyword  { color: #cc7832; }
+.tok-string   { color: #6a8759; }
+.tok-comment  { color: #8a8a8a; font-style: italic; }
+.tok-number   { color: #6897bb; }
+.tok-type     { color: #e8bf6a; }
+.tok-fn       { color: #ffc66d; }
+.tok-constant { color: #9876aa; }
+.tok-annotation { color: #bbb529; }
+.tok-punct    { color: #a9b7c6; }
+.tok-plain    { color: #a9b7c6; }
+.tok-tag      { color: #e8bf6a; }
+.tok-attr     { color: #bababa; }
+
+/* ---------- selection + scrollbars ---------- */
+::selection {
+  background: #214283;
+  color: inherit;
+}
+
+.scroll-jb {
+  scrollbar-width: thin;
+  scrollbar-color: #4e5254 transparent;
+}
+.scroll-jb::-webkit-scrollbar        { width: 12px; height: 12px; }
+.scroll-jb::-webkit-scrollbar-track  { background: transparent; }
+.scroll-jb::-webkit-scrollbar-thumb  {
+  background: #505050;
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.scroll-jb::-webkit-scrollbar-thumb:hover {
+  background: #6a6a6a;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+.scroll-jb::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---------- vcs file status ---------- */
+.vcs-modified { color: #6897bb; }
+.vcs-added    { color: #629755; }
+.vcs-ignored  { color: #727272; }
+
+/* ---------- caret blink ---------- */
+@keyframes jb-blink {
+  0%,  49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.caret-blink {
+  animation: jb-blink 1.05s steps(1) infinite;
+}
+
+/* ---------- error squiggle ---------- */
+.squiggle-error {
+  text-decoration: underline wavy #d64f4f;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.squiggle-warn {
+  text-decoration: underline wavy #d6c04f;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------- fade-in ---------- */
+@keyframes jb-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.fade-in {
+  animation: jb-fade 0.12s ease-out;
+}
+
+/* dotted indent guide background helper */
+.indent-guides {
+  background-image: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% - 1px),
+    rgba(255, 255, 255, 0.04) calc(100% - 1px)
+  );
+}
