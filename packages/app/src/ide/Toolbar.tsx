@@ -1,15 +1,16 @@
 import { cn } from "../utils/cn";
-import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit } from "./icons";
+import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit, Search } from "./icons";
 
 interface Props {
   running: boolean;
   onRun: () => void;
   onStop: () => void;
+  onFind: () => void;
 }
 
 const sep = "mx-1.5 h-4 w-px bg-[#2b2b2b]/60";
 
-export function Toolbar({ running, onRun, onStop }: Props) {
+export function Toolbar({ running, onRun, onStop, onFind }: Props) {
   return (
     <div className="flex h-8 items-center bg-[#3c3f41] px-2 text-[#bbbbbb]">
       {/* run configuration */}
@@ -68,7 +69,16 @@ export function Toolbar({ running, onRun, onStop }: Props) {
         <Sync className="h-4 w-4 text-[#bcbcbc]" />
       </button>
 
-      <div className="flex-1" />
+      <div className="flex flex-1 items-center justify-center">
+        <button
+          onClick={onFind}
+          className="flex items-center gap-2 rounded-md bg-[#2b2b2b] px-2.5 py-0.5 text-[12px] text-[#8b9094] hover:bg-[#313131]"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span>Search Everywhere</span>
+          <span className="rounded border border-[#555] px-1 text-[10px]">⇧⇧</span>
+        </button>
+      </div>
 
       <button className="flex items-center gap-1.5 rounded px-2 py-0.5 text-[12px] text-[#dcdcdc] hover:bg-[#464a4d]">
         <Commit className="h-4 w-4 text-[#7fd17f]" />

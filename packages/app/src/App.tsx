@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import { TopBar, type IdeActions } from "./ide/TopBar";
+import { useEffect, useMemo, useState } from "react";
 import { Toolbar } from "./ide/Toolbar";
 import { FileTree } from "./ide/FileTree";
 import { EditorArea } from "./ide/EditorArea";
@@ -114,23 +113,48 @@ export default function App() {
     setBottomOpen(true);
   };
 
-  const actions: IdeActions = {
-    onRun: () => {},
-    onStop: () => {},
-    onToggleProject: () => setLeftOpen((o) => !o),
-    onToggleStructure: () => setAiOpen((o) => !o),
-    onToggleBottom: (tab) => {
-      if (tab) {
-        setBottomOpen(true);
-        setBottomTab(tab as BottomTab);
-      } else {
-        setBottomOpen((o) => !o);
-      }
-    },
-    onFind: () => {
-      setBottomOpen(true);
-    },
+  const run = () => {};
+  const stop = () => {};
+  const openFind = () => {
+    setBottomOpen(true);
   };
+  const toggleBottom = (tab?: BottomTab) => {
+    if (tab) {
+      setBottomOpen(true);
+      setBottomTab(tab);
+    } else {
+      setBottomOpen((o) => !o);
+    }
+  };
+
+  useEffect(() => {
+    return window.ide?.onMenuAction?.((action) => {
+      switch (action) {
+        case "find":
+        case "find-in-files":
+          openFind();
+          break;
+        case "toggle-project":
+          setLeftOpen((o) => !o);
+          break;
+        case "toggle-structure":
+          setAiOpen((o) => !o);
+          break;
+        case "toggle-terminal":
+          toggleBottom("terminal");
+          break;
+        case "toggle-problems":
+          toggleBottom("problems");
+          break;
+        case "run":
+          run();
+          break;
+        case "stop":
+          stop();
+          break;
+      }
+    });
+  }, []);
 
   const leftItems: StripItem[] = [
     { id: "project", icon: Cube, label: "Project (⌘1)", active: leftOpen, onClick: () => setLeftOpen((o) => !o) },
@@ -147,8 +171,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen select-none flex-col overflow-hidden bg-[#2b2b2b] text-[#c8c8c8]">
-      <TopBar actions={actions} />
-      <Toolbar running={false} onRun={() => {}} onStop={() => {}} />
+      <Toolbar running={false} onRun={run} onStop={stop} onFind={openFind} />
 
       <div className="flex min-h-0 flex-1">
         <ToolStrip side="left" top={leftItems} />
