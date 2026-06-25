@@ -1,94 +1,54 @@
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { cn } from "../utils/cn";
-import { toLines, getStructure, type Token } from "./highlight";
+import { getStructure } from "./highlight";
 import { FileBadge, ChevronRight, Folder, FolderOpen, Close } from "./icons";
 import type { FileNode } from "./projectData";
 
 const APP_ID = "root/src/App.tsx";
 
-function tokenClass(c: string, fileId: string, text: string): string {
-  if (c === "ws") return "";
-  let cls = `tok-${c}`;
-  if (fileId === APP_ID && text === "FilterBar") cls += " squiggle-error";
-  return cls;
-}
-
-function Caret() {
-  return (
-    <span className="caret-blink ml-px inline-block h-[14px] w-[2px] translate-y-[3px] bg-[#cfcfcf] align-middle" />
-  );
-}
-
 interface CodeProps {
   file: FileNode;
   cursorLine: number;
   onLineClick: (line: number) => void;
+  onChange: (content: string) => void;
 }
 
-function CodeView({ file, cursorLine, onLineClick }: CodeProps) {
-  const [cw, setCw] = useState(7.8);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const lines = useMemo(() => toLines(file.content), [file]);
-  const rawLines = useMemo(() => file.content.split("\n"), [file]);
-
-  useLayoutEffect(() => {
-    if (measureRef.current) {
-      const w = measureRef.current.getBoundingClientRect().width / 60;
-      if (w > 0) setCw(w);
-    }
-  }, []);
+function CodeView({ file, cursorLine, onLineClick, onChange }: CodeProps) {
+  const rawLines = useMemo(() => file.content.split("\n"), [file.content]);
 
   return (
     <div className="scroll-jb relative min-h-0 flex-1 overflow-auto bg-[#2b2b2b] font-mono-jb text-[13px] leading-[21px]">
-      <span ref={measureRef} className="pointer-events-none absolute -z-10 opacity-0">
-        {"0".repeat(60)}
-      </span>
-      <div className="min-w-max pb-[35vh]">
-        {lines.map((toks, idx) => {
+      <div className="flex min-h-full min-w-max pb-[35vh]">
+        <div className="sticky left-0 z-10 select-none border-r border-black/30 bg-[#313335] py-0 text-right text-[#868686]" style={{ minWidth: 58 }}>
+          {rawLines.map((_line, idx) => {
           const active = idx === cursorLine - 1;
-          const leading = rawLines[idx]?.match(/^ */)?.[0].length ?? 0;
-          const levels = Math.floor(leading / 2);
           return (
-            <div key={idx} className="flex">
-              <span
-                className={cn(
-                  "sticky left-0 z-10 select-none border-r border-black/30 bg-[#313335] pl-3 pr-2 text-right text-[#868686]",
-                  active && "bg-[#3a3a3a] text-[#c9c9c9]",
-                )}
-                style={{ minWidth: 58 }}
+              <button
+                key={idx}
+                onClick={() => onLineClick(idx + 1)}
+                className={cn("block h-[21px] w-full pl-3 pr-2 text-right", active && "bg-[#3a3a3a] text-[#c9c9c9]")}
               >
                 {idx + 1}
-              </span>
-              <span
-                className={cn("relative cursor-text whitespace-pre pr-10", active && "bg-[#323232]")}
-                onClick={() => onLineClick(idx + 1)}
-              >
-                {levels > 0 &&
-                  Array.from({ length: levels }, (_, k) => (
-                    <span
-                      key={k}
-                      className="pointer-events-none absolute bottom-0 top-0 w-px bg-white/[0.045]"
-                      style={{ left: (k + 1) * 2 * cw - 1 }}
-                    />
-                  ))}
-                {toks.length === 0 ? (
-                  active ? (
-                    <Caret />
-                  ) : (
-                    <span>&nbsp;</span>
-                  )
-                ) : (
-                  toks.map((tk: Token, i: number) => (
-                    <span key={i} className={tokenClass(tk.c, file.id, tk.t)}>
-                      {tk.t}
-                      {active && i === toks.length - 1 && <Caret />}
-                    </span>
-                  ))
-                )}
-              </span>
-            </div>
+              </button>
           );
         })}
+        </div>
+        <textarea
+          value={file.content}
+          spellCheck={false}
+          onChange={(event) => onChange(event.target.value)}
+          onClick={(event) => {
+            const target = event.currentTarget;
+            const line = target.value.slice(0, target.selectionStart).split("\n").length;
+            onLineClick(line);
+          }}
+          onKeyUp={(event) => {
+            const target = event.currentTarget;
+            const line = target.value.slice(0, target.selectionStart).split("\n").length;
+            onLineClick(line);
+          }}
+          className="min-h-full min-w-[900px] flex-1 resize-none border-0 bg-[#2b2b2b] px-3 py-0 font-mono-jb text-[13px] leading-[21px] text-[#c8c8c8] outline-none selection:bg-[#214283]"
+        />
       </div>
     </div>
   );
@@ -147,6 +107,7 @@ function TabBar({
             {active && <span className="absolute left-0 top-0 h-[2px] w-full bg-[#4d78b8]" />}
             <FileBadge ext={t.ext} />
             <span className="max-w-[150px] truncate">{t.name}</span>
+            {t.dirty && <span className="h-1.5 w-1.5 rounded-full bg-[#8bb3dd]" title="Unsaved changes" />}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -206,9 +167,10 @@ export interface EditorAreaProps {
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onLineClick: (line: number) => void;
+  onChange: (id: string, content: string) => void;
 }
 
-export function EditorArea({ tabs, activeFile, cursorLine, onActivate, onClose, onLineClick }: EditorAreaProps) {
+export function EditorArea({ tabs, activeFile, cursorLine, onActivate, onClose, onLineClick, onChange }: EditorAreaProps) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#2b2b2b]">
       <TabBar tabs={tabs} activeId={activeFile?.id ?? null} onActivate={onActivate} onClose={onClose} />
@@ -216,7 +178,7 @@ export function EditorArea({ tabs, activeFile, cursorLine, onActivate, onClose, 
         <>
           <Breadcrumb file={activeFile} />
           <div className="relative flex min-h-0 flex-1">
-            <CodeView file={activeFile} cursorLine={cursorLine} onLineClick={onLineClick} />
+            <CodeView file={activeFile} cursorLine={cursorLine} onLineClick={onLineClick} onChange={(content) => onChange(activeFile.id, content)} />
             <MarkerBar file={activeFile} />
           </div>
         </>

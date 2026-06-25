@@ -1,6 +1,17 @@
 import { Menu, app, BrowserWindow } from 'electron';
 
-type MenuAction = 'find' | 'find-in-files' | 'toggle-project' | 'toggle-structure' | 'toggle-terminal' | 'toggle-problems' | 'run' | 'stop';
+type MenuAction =
+  | 'open-folder'
+  | 'save'
+  | 'close-tab'
+  | 'find'
+  | 'find-in-files'
+  | 'toggle-project'
+  | 'toggle-structure'
+  | 'toggle-terminal'
+  | 'toggle-problems'
+  | 'run'
+  | 'stop';
 
 function sendAction(action: MenuAction) {
   const win = BrowserWindow.getFocusedWindow();
@@ -13,10 +24,12 @@ export function createApplicationMenu() {
       label: 'File',
       submenu: [
         { label: 'New File', accelerator: 'CmdOrCtrl+N' },
-        { label: 'Open Folder...', accelerator: 'CmdOrCtrl+O' },
+        { label: 'Open Folder...', accelerator: 'CmdOrCtrl+O', click: () => sendAction('open-folder') },
         { type: 'separator' },
-        { label: 'Save', accelerator: 'CmdOrCtrl+S' },
+        { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendAction('save') },
         { label: 'Save All', accelerator: 'CmdOrCtrl+Shift+S' },
+        { type: 'separator' },
+        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendAction('close-tab') },
         { type: 'separator' },
         { label: 'Settings...', accelerator: 'CmdOrCtrl+,' },
         { type: 'separator' },
@@ -58,7 +71,7 @@ export function createApplicationMenu() {
     {
       label: 'Navigate',
       submenu: [
-        { label: 'Class...', accelerator: 'CmdOrCtrl+O' },
+        { label: 'Class...' },
         { label: 'File...', accelerator: 'CmdOrCtrl+Shift+O' },
         { label: 'Symbol...', accelerator: 'CmdOrCtrl+Alt+O' },
         { type: 'separator' },

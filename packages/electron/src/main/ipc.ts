@@ -41,4 +41,13 @@ export function registerIpcHandlers() {
   ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
     await fs.writeFile(filePath, content, 'utf8');
   });
+  ipcMain.handle('create-file', async (_event, filePath: string, content = '') => {
+    await fs.writeFile(filePath, content, { encoding: 'utf8', flag: 'wx' });
+  });
+  ipcMain.handle('create-directory', async (_event, directoryPath: string) => {
+    await fs.mkdir(directoryPath, { recursive: false });
+  });
+  ipcMain.handle('delete-entry', async (_event, entryPath: string) => {
+    await fs.rm(entryPath, { recursive: true, force: false });
+  });
 }

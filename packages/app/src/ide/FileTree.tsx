@@ -1,5 +1,5 @@
 import { cn } from "../utils/cn";
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileBadge, Search, Sync, Gear } from "./icons";
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileBadge, Search, Sync, Gear, Plus, Close } from "./icons";
 import type { DirNode, FileNode, TreeNode, VcsStatus } from "./projectData";
 
 function nodeHasChanges(node: TreeNode): boolean {
@@ -17,20 +17,26 @@ interface RowProps {
   activeId: string | null;
   onToggle: (id: string) => void;
   onOpen: (id: string) => void;
+  onSelect: (id: string) => void;
 }
 
-function Row({ node, depth, expanded, activeId, onToggle, onOpen }: RowProps) {
+function Row({ node, depth, expanded, activeId, onToggle, onOpen, onSelect }: RowProps) {
   const pad = 8 + depth * 14;
 
   if (node.type === "dir") {
     const isOpen = expanded.has(node.id);
+    const active = activeId === node.id;
     const changed = nodeHasChanges(node);
     return (
       <div>
         <button
-          onClick={() => onToggle(node.id)}
+          onClick={() => {
+            onSelect(node.id);
+            onToggle(node.id);
+          }}
           className={cn(
             "group flex w-full items-center gap-1 py-[2px] pr-2 text-left text-[12.5px] hover:bg-[#3a3d3f]",
+            active && "bg-[#2f5f8f] text-white",
             changed ? "text-[#82a6cf]" : "text-[#c8c8c8]",
           )}
           style={{ paddingLeft: pad }}
@@ -51,6 +57,7 @@ function Row({ node, depth, expanded, activeId, onToggle, onOpen }: RowProps) {
               activeId={activeId}
               onToggle={onToggle}
               onOpen={onOpen}
+              onSelect={onSelect}
             />
           ))}
       </div>
@@ -79,20 +86,41 @@ interface Props {
   activeId: string | null;
   onToggle: (id: string) => void;
   onOpen: (id: string) => void;
+  onSelect: (id: string) => void;
+  onOpenFolder: () => void;
+  onRefresh: () => void;
+  onCreateFile: () => void;
+  onCreateFolder: () => void;
+  onDeleteActive: () => void;
   fileCount: number;
+  isRealWorkspace: boolean;
 }
 
-export function FileTree({ root, expanded, activeId, onToggle, onOpen, fileCount }: Props) {
+export function FileTree({
+  root,
+  expanded,
+  activeId,
+  onToggle,
+  onOpen,
+  onSelect,
+  onOpenFolder,
+  onRefresh,
+  onCreateFile,
+  onCreateFolder,
+  onDeleteActive,
+  fileCount,
+  isRealWorkspace,
+}: Props) {
   return (
     <div className="flex h-full flex-col bg-[#3c3f41]">
       {/* header */}
       <div className="flex h-[26px] shrink-0 items-center px-2 text-[11px] font-semibold uppercase tracking-wide text-[#9aa0a4]">
         <span>Project</span>
         <div className="flex-1" />
-        <button className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
+        <button onClick={onOpenFolder} title="Open Folder" className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
           <Search className="h-3.5 w-3.5" />
         </button>
-        <button className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
+        <button onClick={onRefresh} title="Refresh Project" className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
           <Sync className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -100,8 +128,36 @@ export function FileTree({ root, expanded, activeId, onToggle, onOpen, fileCount
       {/* project selector row */}
       <div className="flex items-center gap-1.5 px-2 py-1 text-[12.5px] text-[#dcdcdc]">
         <Folder className="h-4 w-4 shrink-0" />
-        <span className="font-medium">taskflow</span>
+        <span className="truncate font-medium" title={root.id}>{root.name}</span>
         <ChevronDown className="h-3 w-3 text-[#9aa0a4]" />
+      </div>
+
+      <div className="flex h-[26px] shrink-0 items-center gap-1 border-y border-black/25 px-2 text-[11.5px] text-[#b9bec3]">
+        <button
+          onClick={onCreateFile}
+          disabled={!isRealWorkspace}
+          title={isRealWorkspace ? "New File" : "Open a real folder to create files"}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-[#464a4d] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" /> File
+        </button>
+        <button
+          onClick={onCreateFolder}
+          disabled={!isRealWorkspace}
+          title={isRealWorkspace ? "New Folder" : "Open a real folder to create folders"}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-[#464a4d] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Folder className="h-3.5 w-3.5" /> Folder
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={onDeleteActive}
+          disabled={!isRealWorkspace || !activeId}
+          title={isRealWorkspace ? "Delete Active File/Folder" : "Open a real folder to delete entries"}
+          className="grid h-5 w-5 place-items-center rounded text-[#c58b82] hover:bg-[#464a4d] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Close className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {/* tree */}
@@ -115,6 +171,7 @@ export function FileTree({ root, expanded, activeId, onToggle, onOpen, fileCount
             activeId={activeId}
             onToggle={onToggle}
             onOpen={onOpen}
+            onSelect={onSelect}
           />
         ))}
         <div className="px-3 pb-4 pt-3 text-[10.5px] text-[#6f7377]">

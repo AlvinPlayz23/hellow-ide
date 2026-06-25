@@ -8,6 +8,8 @@ export interface FileNode {
   lang: string;
   vcs?: VcsStatus;
   content: string;
+  loaded?: boolean;
+  dirty?: boolean;
 }
 
 export interface DirNode {

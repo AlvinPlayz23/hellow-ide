@@ -1,16 +1,17 @@
 import { cn } from "../utils/cn";
-import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit, Search } from "./icons";
+import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit, Search, Folder } from "./icons";
 
 interface Props {
   running: boolean;
   onRun: () => void;
   onStop: () => void;
   onFind: () => void;
+  onOpenFolder: () => void;
 }
 
 const sep = "mx-1.5 h-4 w-px bg-[#2b2b2b]/60";
 
-export function Toolbar({ running, onRun, onStop, onFind }: Props) {
+export function Toolbar({ running, onRun, onStop, onFind, onOpenFolder }: Props) {
   return (
     <div className="flex h-8 items-center bg-[#3c3f41] px-2 text-[#bbbbbb]">
       {/* run configuration */}
@@ -52,6 +53,12 @@ export function Toolbar({ running, onRun, onStop, onFind }: Props) {
 
       <button title="Build Project (⌘F9)" className="grid h-6 w-6 place-items-center rounded hover:bg-[#464a4d]">
         <Hammer className="h-4 w-4 text-[#bcbcbc]" />
+      </button>
+
+      <div className={sep} />
+
+      <button onClick={onOpenFolder} title="Open Folder (Ctrl+O)" className="grid h-6 w-6 place-items-center rounded hover:bg-[#464a4d]">
+        <Folder className="h-4 w-4 text-[#bcbcbc]" />
       </button>
 
       <div className={sep} />

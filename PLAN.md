@@ -389,18 +389,83 @@ Root `package.json`:
 
 ---
 
-## Implementation Order
+## Revised Implementation Phases
 
-1. Project scaffolding (pnpm init, tsconfig, vite config)
-2. Set up pnpm workspaces for monorepo structure
-3. Install Tailwind CSS + shadcn/ui + lucide-react
-4. Electron main process + window
-5. Preload bridge
-6. React layout shell with Tailwind + JetBrains Darcula theme
-7. Sidebar with file explorer (shadcn ScrollArea + custom tree)
-8. Tab bar (shadcn Tabs + custom editor tabs)
-9. Editor core (custom text buffer, cursor, keyboard input)
-10. File open/save integration
-11. Bottom panel placeholder (shadcn Tabs)
-12. Keyboard shortcuts
-13. Polish and refinement
+The UI shell has evolved into a richer JetBrains-style environment, so the build order is now organized around turning that shell into a real IDE while keeping the current mock project as a demo/fallback state.
+
+### Phase 1 — IDE Shell Behavior
+
+- [x] Project scaffolding with pnpm workspaces
+- [x] Electron main process + preload bridge
+- [x] React/Vite renderer shell
+- [x] JetBrains-style toolbar, side tool strips, editor area, bottom panel, status bar
+- [x] Tab lifecycle: activate and close open tabs
+- [x] Core keyboard shortcut routing
+- [x] Electron native menu actions routed to renderer actions
+- [x] Run/stop UI state and status feedback
+- [x] Lightweight action toast/feedback surface
+- [ ] Command/action palette with searchable commands
+- [ ] Persist panel visibility/layout between sessions
+
+### Phase 2 — Workspace & File System
+
+- [x] Electron IPC handlers for open folder, read directory, read file, and write file
+- [x] Renderer preload API for file system calls
+- [x] Open real folder from toolbar/menu/shortcut
+- [x] Render real workspace tree in the Project panel
+- [x] Open real files from the Project tree
+- [x] Track open tabs from real files
+- [ ] Track dirty state per file
+- [x] Save active file to disk
+- [x] Create files from the Project panel UI
+- [x] Create folders from the Project panel UI
+- [x] Delete selected files/folders from the Project panel UI
+- [x] Refresh real workspace tree from the Project panel UI
+- [ ] Save all dirty files
+- [ ] Recent workspaces
+- [ ] Reload from disk
+- [ ] Safe handling for binary/large files
+
+### Phase 3 — Custom Editor Core
+
+- [x] Replace static code view with editable text buffer
+- [ ] Hidden textarea/keyboard capture model
+- [ ] Caret placement by click
+- [ ] Arrow-key caret movement
+- [x] Insert characters
+- [ ] Backspace/delete
+- [x] Enter/newline handling
+- [ ] Tab inserts two spaces
+- [ ] Selection model
+- [ ] Copy/cut/paste
+- [ ] Undo/redo history
+- [x] Dirty-state integration with file saving
+
+### Phase 4 — Developer Environment
+
+- [ ] Real terminal/process bridge or PTY integration
+- [ ] Problems model independent of mock data
+- [ ] Jump from problem to file/line
+- [ ] Run configurations
+- [ ] Build/test task output
+- [ ] Status bar indicators sourced from real workspace/editor state
+- [ ] Basic VCS status detection
+
+### Phase 5 — Language Intelligence
+
+- [ ] Syntax highlighting for common languages
+- [ ] Current line highlight and indentation guides
+- [ ] Find/replace
+- [ ] Word wrap toggle
+- [ ] Bracket auto-close
+- [ ] Diagnostics in gutter/editor
+- [ ] LSP client transport
+- [ ] Completions, hover, and go-to-definition
+
+### Phase 6 — AI Layer
+
+- [ ] AI chat connected to active file/workspace context
+- [ ] Inline AI suggestions
+- [ ] Streaming completions
+- [ ] Code actions/refactor suggestions
+- [ ] Prompt/context privacy controls
