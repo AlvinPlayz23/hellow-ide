@@ -450,6 +450,7 @@ The UI shell has evolved into a richer JetBrains-style environment, so the build
 ### Phase 4 — Developer Environment
 
 - [x] Real terminal/process bridge or PTY integration
+- [x] Persistent PTY shell with streamed output and Ctrl+C support
 - [x] Problems model independent of mock data
 - [ ] Jump from problem to file/line
 - [ ] Run configurations

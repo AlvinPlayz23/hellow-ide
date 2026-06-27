@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "electron-store": "^10.0.0"
+    "electron-store": "^10.0.0",
+    "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

@@ -79,6 +79,10 @@ const termColor: Record<TermLine["type"], string> = {
 
 const TERMINAL_ID = "main";
 
+function stripAnsi(text: string) {
+  return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "");
+}
+
 function Prompt({ cwd }: { cwd?: string }) {
   const label = cwd?.split(/[\\/]/).filter(Boolean).pop() ?? "workspace";
   return (
@@ -91,8 +95,7 @@ function Prompt({ cwd }: { cwd?: string }) {
 
 function TerminalView({ cwd }: { cwd?: string }) {
   const [lines, setLines] = useState<TermLine[]>([
-    { type: "sys", text: "Hellow Terminal — real shell commands" },
-    { type: "sys", text: "Type a command and press Enter." },
+    { type: "sys", text: "Hellow Terminal — PTY shell" },
   ]);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -108,7 +111,9 @@ function TerminalView({ cwd }: { cwd?: string }) {
   useEffect(() => {
     const offData = window.ide?.onTerminalData?.((event) => {
       if (event.id !== TERMINAL_ID) return;
-      setLines((prev) => [...prev, { type: event.type === "stderr" ? "err" : "out", text: event.text }]);
+      const text = stripAnsi(event.text).replace(/\r/g, "");
+      if (!text) return;
+      setLines((prev) => [...prev, { type: event.type === "stderr" ? "err" : "out", text }]);
     });
     const offExit = window.ide?.onTerminalExit?.((event) => {
       if (event.id !== TERMINAL_ID) return;
@@ -122,6 +127,17 @@ function TerminalView({ cwd }: { cwd?: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    setRunning(true);
+    setLines((prev) => [...prev, { type: "sys", text: cwd ? `Terminal cwd: ${cwd}` : "Terminal cwd: application workspace" }]);
+    void window.ide?.terminalStop?.(TERMINAL_ID).finally(() => {
+      void window.ide?.terminalStart?.(TERMINAL_ID, cwd).catch((error) => {
+        setRunning(false);
+        setLines((prev) => [...prev, { type: "err", text: String(error) }]);
+      });
+    });
+  }, [cwd]);
+
   const submit = () => {
     const value = input.trim();
     if (!value) return;
@@ -129,10 +145,8 @@ function TerminalView({ cwd }: { cwd?: string }) {
     if (value === "clear") {
       setLines([]);
     } else {
-      const cmdLine: TermLine = { type: "cmd", text: value };
-      setLines((prev) => [...prev, cmdLine]);
-      setRunning(true);
-      void window.ide?.terminalRun?.(TERMINAL_ID, value, cwd).catch((error) => {
+      setLines((prev) => [...prev, { type: "cmd", text: value }]);
+      void window.ide?.terminalRun?.(TERMINAL_ID, value).catch((error) => {
         setRunning(false);
         setLines((prev) => [...prev, { type: "err", text: String(error) }]);
       });
@@ -148,9 +162,7 @@ function TerminalView({ cwd }: { cwd?: string }) {
       submit();
     } else if (e.key.toLowerCase() === "c" && (e.ctrlKey || e.metaKey) && running) {
       e.preventDefault();
-      void window.ide?.terminalStop?.(TERMINAL_ID);
-      setRunning(false);
-      setLines((prev) => [...prev, { type: "sys", text: "Process terminated" }]);
+      void window.ide?.terminalWrite?.(TERMINAL_ID, "\x03");
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (history.length) {

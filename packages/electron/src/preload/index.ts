@@ -11,7 +11,10 @@ const ide = {
   deleteEntry: (path: string) => ipcRenderer.invoke('delete-entry', path) as Promise<void>,
   getRecentWorkspaces: () => ipcRenderer.invoke('get-recent-workspaces') as Promise<string[]>,
   addRecentWorkspace: (path: string) => ipcRenderer.invoke('add-recent-workspace', path) as Promise<void>,
-  terminalRun: (id: string, command: string, cwd?: string) => ipcRenderer.invoke('terminal-run', id, command, cwd) as Promise<void>,
+  terminalStart: (id: string, cwd?: string) => ipcRenderer.invoke('terminal-start', id, cwd) as Promise<void>,
+  terminalWrite: (id: string, data: string) => ipcRenderer.invoke('terminal-write', id, data) as Promise<void>,
+  terminalResize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('terminal-resize', id, cols, rows) as Promise<void>,
+  terminalRun: (id: string, command: string) => ipcRenderer.invoke('terminal-run', id, command) as Promise<void>,
   terminalStop: (id: string) => ipcRenderer.invoke('terminal-stop', id) as Promise<void>,
   onTerminalData: (callback: (event: { id: string; type: 'stdout' | 'stderr'; text: string }) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: { id: string; type: 'stdout' | 'stderr'; text: string }) => callback(payload);

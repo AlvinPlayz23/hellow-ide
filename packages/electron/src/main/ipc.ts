@@ -1,11 +1,11 @@
 import { app, dialog, ipcMain } from 'electron';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as pty from 'node-pty';
 
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 const recentWorkspacesPath = () => path.join(app.getPath('userData'), 'recent-workspaces.json');
-const terminalProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+const terminalProcesses = new Map<string, pty.IPty>();
 
 export interface DirEntry {
   name: string;
@@ -108,38 +108,44 @@ export function registerIpcHandlers() {
   });
   ipcMain.handle('get-recent-workspaces', () => readRecentWorkspaces());
   ipcMain.handle('add-recent-workspace', (_event, workspacePath: string) => addRecentWorkspace(workspacePath));
-  ipcMain.handle('terminal-run', async (event, id: string, command: string, cwd?: string) => {
+  ipcMain.handle('terminal-start', async (event, id: string, cwd?: string) => {
     const existing = terminalProcesses.get(id);
-    if (existing) existing.kill();
+    if (existing) return;
 
-    const shell = process.platform === 'win32' ? 'cmd.exe' : 'sh';
-    const args = process.platform === 'win32' ? ['/d', '/s', '/c', command] : ['-lc', command];
-    const child = spawn(shell, args, {
+    const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const child = pty.spawn(shell, [], {
+      name: 'xterm-256color',
+      cols: 120,
+      rows: 30,
       cwd: cwd || process.cwd(),
-      env: process.env,
-      windowsHide: true
+      env: process.env as Record<string, string>
     });
 
     terminalProcesses.set(id, child);
 
-    child.stdout.on('data', (chunk: Buffer) => {
-      event.sender.send('terminal-data', { id, type: 'stdout', text: chunk.toString() });
+    child.onData((text) => {
+      event.sender.send('terminal-data', { id, type: 'stdout', text });
     });
-    child.stderr.on('data', (chunk: Buffer) => {
-      event.sender.send('terminal-data', { id, type: 'stderr', text: chunk.toString() });
+    child.onExit(({ exitCode }) => {
+      if (terminalProcesses.get(id) === child) {
+        terminalProcesses.delete(id);
+      }
+      event.sender.send('terminal-exit', { id, code: exitCode });
     });
-    child.on('error', (error) => {
-      event.sender.send('terminal-data', { id, type: 'stderr', text: `${error.message}\n` });
-    });
-    child.on('close', (code) => {
-      terminalProcesses.delete(id);
-      event.sender.send('terminal-exit', { id, code });
-    });
+  });
+  ipcMain.handle('terminal-write', (_event, id: string, data: string) => {
+    terminalProcesses.get(id)?.write(data);
+  });
+  ipcMain.handle('terminal-resize', (_event, id: string, cols: number, rows: number) => {
+    terminalProcesses.get(id)?.resize(cols, rows);
+  });
+  ipcMain.handle('terminal-run', async (_event, id: string, command: string) => {
+    terminalProcesses.get(id)?.write(`${command}\r`);
   });
   ipcMain.handle('terminal-stop', (_event, id: string) => {
     const child = terminalProcesses.get(id);
     if (!child) return;
-    child.kill();
     terminalProcesses.delete(id);
+    child.kill();
   });
 }
