@@ -1,5 +1,5 @@
 import { cn } from "../utils/cn";
-import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit, Search, Folder } from "./icons";
+import { ArrowLeft, ArrowRight, CaretRun, ChevronDown, Debug, Stop, Sync, Hammer, Commit, Search, Folder, Plus } from "./icons";
 
 interface Props {
   running: boolean;
@@ -7,11 +7,14 @@ interface Props {
   onStop: () => void;
   onFind: () => void;
   onOpenFolder: () => void;
+  onCreateFile: () => void;
+  onCreateFolder: () => void;
+  isRealWorkspace: boolean;
 }
 
 const sep = "mx-1.5 h-4 w-px bg-[#2b2b2b]/60";
 
-export function Toolbar({ running, onRun, onStop, onFind, onOpenFolder }: Props) {
+export function Toolbar({ running, onRun, onStop, onFind, onOpenFolder, onCreateFile, onCreateFolder, isRealWorkspace }: Props) {
   return (
     <div className="flex h-8 items-center bg-[#3c3f41] px-2 text-[#bbbbbb]">
       {/* run configuration */}
@@ -58,6 +61,25 @@ export function Toolbar({ running, onRun, onStop, onFind, onOpenFolder }: Props)
       <div className={sep} />
 
       <button onClick={onOpenFolder} title="Open Folder (Ctrl+O)" className="grid h-6 w-6 place-items-center rounded hover:bg-[#464a4d]">
+        <Folder className="h-4 w-4 text-[#bcbcbc]" />
+      </button>
+
+      <div className={sep} />
+
+      <button
+        onClick={onCreateFile}
+        disabled={!isRealWorkspace}
+        title={isRealWorkspace ? "New File (⌃N)" : "Open a folder first"}
+        className="grid h-6 w-6 place-items-center rounded hover:bg-[#464a4d] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus className="h-4 w-4 text-[#bcbcbc]" />
+      </button>
+      <button
+        onClick={onCreateFolder}
+        disabled={!isRealWorkspace}
+        title={isRealWorkspace ? "New Folder" : "Open a folder first"}
+        className="grid h-6 w-6 place-items-center rounded hover:bg-[#464a4d] disabled:cursor-not-allowed disabled:opacity-40"
+      >
         <Folder className="h-4 w-4 text-[#bcbcbc]" />
       </button>
 

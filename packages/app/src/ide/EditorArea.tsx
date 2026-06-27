@@ -1,20 +1,55 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, useCallback, useMemo, useRef, type KeyboardEvent } from "react";
 import { cn } from "../utils/cn";
 import { getStructure } from "./highlight";
 import { FileBadge, ChevronRight, Folder, FolderOpen, Close } from "./icons";
 import type { FileNode } from "./projectData";
 
-const APP_ID = "root/src/App.tsx";
-
 interface CodeProps {
   file: FileNode;
   cursorLine: number;
-  onLineClick: (line: number) => void;
+  cursorCol: number;
+  onCursorChange: (line: number, col: number) => void;
   onChange: (content: string) => void;
 }
 
-function CodeView({ file, cursorLine, onLineClick, onChange }: CodeProps) {
+function cursorFromTextarea(ta: HTMLTextAreaElement) {
+  const before = ta.value.slice(0, ta.selectionStart);
+  const lines = before.split("\n");
+  const line = lines.length;
+  const col = lines[lines.length - 1].length + 1;
+  return { line, col };
+}
+
+function CodeView({ file, cursorLine, cursorCol, onCursorChange, onChange }: CodeProps) {
   const rawLines = useMemo(() => file.content.split("\n"), [file.content]);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  const updateCursor = useCallback(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const { line, col } = cursorFromTextarea(ta);
+    onCursorChange(line, col);
+  }, [onCursorChange]);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    event.preventDefault();
+
+    const textarea = event.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const nextContent = `${file.content.slice(0, start)}  ${file.content.slice(end)}`;
+    const nextCursor = start + 2;
+
+    onChange(nextContent);
+    requestAnimationFrame(() => {
+      textarea.selectionStart = nextCursor;
+      textarea.selectionEnd = nextCursor;
+      const { line, col } = cursorFromTextarea(textarea);
+      onCursorChange(line, col);
+    });
+  }, [file.content, onChange, onCursorChange]);
 
   return (
     <div className="scroll-jb relative min-h-0 flex-1 overflow-auto bg-[#2b2b2b] font-mono-jb text-[13px] leading-[21px]">
@@ -25,7 +60,7 @@ function CodeView({ file, cursorLine, onLineClick, onChange }: CodeProps) {
           return (
               <button
                 key={idx}
-                onClick={() => onLineClick(idx + 1)}
+                onClick={() => onCursorChange(idx + 1, 1)}
                 className={cn("block h-[21px] w-full pl-3 pr-2 text-right", active && "bg-[#3a3a3a] text-[#c9c9c9]")}
               >
                 {idx + 1}
@@ -34,38 +69,25 @@ function CodeView({ file, cursorLine, onLineClick, onChange }: CodeProps) {
         })}
         </div>
         <textarea
+          ref={taRef}
           value={file.content}
           spellCheck={false}
-          onChange={(event) => onChange(event.target.value)}
-          onClick={(event) => {
-            const target = event.currentTarget;
-            const line = target.value.slice(0, target.selectionStart).split("\n").length;
-            onLineClick(line);
+          onChange={(event) => {
+            onChange(event.target.value);
+            requestAnimationFrame(updateCursor);
           }}
-          onKeyUp={(event) => {
-            const target = event.currentTarget;
-            const line = target.value.slice(0, target.selectionStart).split("\n").length;
-            onLineClick(line);
-          }}
-          className="min-h-full min-w-[900px] flex-1 resize-none border-0 bg-[#2b2b2b] px-3 py-0 font-mono-jb text-[13px] leading-[21px] text-[#c8c8c8] outline-none selection:bg-[#214283]"
+          onClick={updateCursor}
+          onKeyDown={handleKeyDown}
+          onKeyUp={updateCursor}
+          className="min-h-full min-w-[900px] flex-1 resize-none border-0 bg-[#2b2b2b] px-3 py-0 font-mono-jb text-[13px] leading-[21px] text-[#c8c8c8] outline-none selection:bg-[#214283] caret-[#dcdcdc]"
         />
       </div>
     </div>
   );
 }
 
-function MarkerBar({ file }: { file: FileNode }) {
-  const ls = file.content.split("\n");
-  const total = Math.max(1, ls.length);
+function MarkerBar({ file: _file }: { file: FileNode }) {
   const ticks: { top: number; color: string }[] = [];
-  if (file.id === APP_ID) {
-    const idx = ls.findIndex((l) => l.includes("FilterBar"));
-    const errLine = idx >= 0 ? idx + 1 : 44;
-    ticks.push({ top: (errLine / total) * 100, color: "#c7551b" });
-    ticks.push({ top: (13 / total) * 100, color: "#caa53a" });
-  } else {
-    ticks.push({ top: 0.3, color: "#caa53a" });
-  }
   return (
     <div className="pointer-events-none absolute right-[13px] top-0 z-20 h-full w-3">
       <div className="absolute inset-y-0 right-0 w-px bg-white/[0.06]" />
@@ -164,13 +186,14 @@ export interface EditorAreaProps {
   tabs: FileNode[];
   activeFile: FileNode | null;
   cursorLine: number;
+  cursorCol: number;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
-  onLineClick: (line: number) => void;
+  onCursorChange: (line: number, col: number) => void;
   onChange: (id: string, content: string) => void;
 }
 
-export function EditorArea({ tabs, activeFile, cursorLine, onActivate, onClose, onLineClick, onChange }: EditorAreaProps) {
+export function EditorArea({ tabs, activeFile, cursorLine, cursorCol, onActivate, onClose, onCursorChange, onChange }: EditorAreaProps) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#2b2b2b]">
       <TabBar tabs={tabs} activeId={activeFile?.id ?? null} onActivate={onActivate} onClose={onClose} />
@@ -178,7 +201,7 @@ export function EditorArea({ tabs, activeFile, cursorLine, onActivate, onClose, 
         <>
           <Breadcrumb file={activeFile} />
           <div className="relative flex min-h-0 flex-1">
-            <CodeView file={activeFile} cursorLine={cursorLine} onLineClick={onLineClick} onChange={(content) => onChange(activeFile.id, content)} />
+            <CodeView file={activeFile} cursorLine={cursorLine} cursorCol={cursorCol} onCursorChange={onCursorChange} onChange={(content) => onChange(activeFile.id, content)} />
             <MarkerBar file={activeFile} />
           </div>
         </>

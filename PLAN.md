@@ -404,8 +404,10 @@ The UI shell has evolved into a richer JetBrains-style environment, so the build
 - [x] Electron native menu actions routed to renderer actions
 - [x] Run/stop UI state and status feedback
 - [x] Lightweight action toast/feedback surface
-- [ ] Command/action palette with searchable commands
-- [ ] Persist panel visibility/layout between sessions
+- [x] Command/action palette with searchable commands
+- [x] Persist panel visibility/layout between sessions
+- [x] Empty startup state with no hardcoded mock project
+- [x] Custom input/confirmation modals for renderer actions
 
 ### Phase 2 — Workspace & File System
 
@@ -415,27 +417,31 @@ The UI shell has evolved into a richer JetBrains-style environment, so the build
 - [x] Render real workspace tree in the Project panel
 - [x] Open real files from the Project tree
 - [x] Track open tabs from real files
-- [ ] Track dirty state per file
+- [x] Track dirty state per file
 - [x] Save active file to disk
 - [x] Create files from the Project panel UI
 - [x] Create folders from the Project panel UI
 - [x] Delete selected files/folders from the Project panel UI
 - [x] Refresh real workspace tree from the Project panel UI
-- [ ] Save all dirty files
-- [ ] Recent workspaces
-- [ ] Reload from disk
-- [ ] Safe handling for binary/large files
+- [x] Create files/folders from toolbar/menu/command palette actions
+- [x] Save all dirty files
+- [x] Confirm before closing dirty tabs
+- [x] Warn before deleting dirty/open files
+- [x] Show dirty file count in the status bar
+- [x] Recent workspaces
+- [x] Reload from disk
+- [x] Safe handling for binary/large files
 
 ### Phase 3 — Custom Editor Core
 
 - [x] Replace static code view with editable text buffer
 - [ ] Hidden textarea/keyboard capture model
-- [ ] Caret placement by click
-- [ ] Arrow-key caret movement
+- [x] Caret placement by click
+- [x] Arrow-key caret movement
 - [x] Insert characters
-- [ ] Backspace/delete
+- [x] Backspace/delete
 - [x] Enter/newline handling
-- [ ] Tab inserts two spaces
+- [x] Tab inserts two spaces
 - [ ] Selection model
 - [ ] Copy/cut/paste
 - [ ] Undo/redo history
@@ -443,12 +449,12 @@ The UI shell has evolved into a richer JetBrains-style environment, so the build
 
 ### Phase 4 — Developer Environment
 
-- [ ] Real terminal/process bridge or PTY integration
-- [ ] Problems model independent of mock data
+- [x] Real terminal/process bridge or PTY integration
+- [x] Problems model independent of mock data
 - [ ] Jump from problem to file/line
 - [ ] Run configurations
 - [ ] Build/test task output
-- [ ] Status bar indicators sourced from real workspace/editor state
+- [x] Status bar indicators sourced from real workspace/editor state
 - [ ] Basic VCS status detection
 
 ### Phase 5 — Language Intelligence

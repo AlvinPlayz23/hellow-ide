@@ -2,7 +2,11 @@ import { Menu, app, BrowserWindow } from 'electron';
 
 type MenuAction =
   | 'open-folder'
+  | 'new-file'
+  | 'new-folder'
   | 'save'
+  | 'save-all'
+  | 'reload-from-disk'
   | 'close-tab'
   | 'find'
   | 'find-in-files'
@@ -23,11 +27,13 @@ export function createApplicationMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'New File', accelerator: 'CmdOrCtrl+N' },
+        { label: 'New File', accelerator: 'CmdOrCtrl+N', click: () => sendAction('new-file') },
+        { label: 'New Folder', accelerator: 'CmdOrCtrl+Shift+N', click: () => sendAction('new-folder') },
         { label: 'Open Folder...', accelerator: 'CmdOrCtrl+O', click: () => sendAction('open-folder') },
         { type: 'separator' },
         { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => sendAction('save') },
-        { label: 'Save All', accelerator: 'CmdOrCtrl+Shift+S' },
+        { label: 'Save All', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendAction('save-all') },
+        { label: 'Reload from Disk', accelerator: 'CmdOrCtrl+Alt+R', click: () => sendAction('reload-from-disk') },
         { type: 'separator' },
         { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendAction('close-tab') },
         { type: 'separator' },

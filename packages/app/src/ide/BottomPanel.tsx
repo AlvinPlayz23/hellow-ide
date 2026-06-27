@@ -1,16 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../utils/cn";
 import { Terminal, ListCheck, Close, Gear } from "./icons";
-import { FILE_MAP } from "./projectData";
 
 export type BottomTab = "terminal" | "problems";
-
-/** Line of the unresolved <FilterBar /> reference in App.tsx — kept in sync dynamically. */
-const FILTERBAR_LINE = (() => {
-  const f = FILE_MAP["root/src/App.tsx"];
-  const idx = f ? f.content.split("\n").findIndex((l) => l.includes("FilterBar")) : -1;
-  return idx >= 0 ? idx + 1 : 44;
-})();
 
 interface Props {
   tab: BottomTab;
@@ -19,6 +11,7 @@ interface Props {
   onJump: (fileId: string, line: number) => void;
   errors: number;
   warnings: number;
+  cwd?: string;
 }
 
 const TABS: { id: BottomTab; label: string; icon: typeof Terminal }[] = [
@@ -27,7 +20,7 @@ const TABS: { id: BottomTab; label: string; icon: typeof Terminal }[] = [
 ];
 
 export function BottomPanel(props: Props) {
-  const { tab, onTab, onClose, onJump, errors, warnings } = props;
+  const { tab, onTab, onClose, onJump, errors, warnings, cwd } = props;
   return (
     <div className="flex h-[208px] shrink-0 flex-col border-t border-black/40 bg-[#2b2b2b]">
       <div className="flex h-[26px] items-center bg-[#3c3f41] pr-1 text-[12px]">
@@ -65,7 +58,7 @@ export function BottomPanel(props: Props) {
       </div>
 
       <div className="min-h-0 flex-1">
-        {tab === "terminal" && <TerminalView />}
+        {tab === "terminal" && <TerminalView cwd={cwd} />}
         {tab === "problems" && <ProblemsView onJump={onJump} />}
       </div>
     </div>
@@ -84,24 +77,27 @@ const termColor: Record<TermLine["type"], string> = {
   link: "text-[#5fa6c9]",
 };
 
-const PROMPT = (
-  <>
-    <span className="text-[#86c272]">➜</span>{" "}
-    <span className="text-[#5fa6c9]">taskflow</span>{" "}
-    <span className="text-[#e0a48a]">git:(</span>
-    <span className="text-[#cf9c6e]">main</span>
-    <span className="text-[#e0a48a]">)</span>
-  </>
-);
+const TERMINAL_ID = "main";
 
-function TerminalView() {
+function Prompt({ cwd }: { cwd?: string }) {
+  const label = cwd?.split(/[\\/]/).filter(Boolean).pop() ?? "workspace";
+  return (
+    <>
+      <span className="text-[#86c272]">➜</span>{" "}
+      <span className="text-[#5fa6c9]">{label}</span>
+    </>
+  );
+}
+
+function TerminalView({ cwd }: { cwd?: string }) {
   const [lines, setLines] = useState<TermLine[]>([
-    { type: "sys", text: "WebStorm Terminal — zsh" },
-    { type: "sys", text: "Type 'help' for available commands." },
+    { type: "sys", text: "Hellow Terminal — real shell commands" },
+    { type: "sys", text: "Type a command and press Enter." },
   ]);
   const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [hIdx, setHIdx] = useState(-1);
+  const [running, setRunning] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -109,89 +105,37 @@ function TerminalView() {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [lines]);
 
-  const run = (raw: string): TermLine[] => {
-    const c = raw.trim();
-    const [name, ...args] = c.split(/\s+/);
-    switch (name) {
-      case "":
-        return [];
-      case "help":
-        return [{ type: "out", text: "commands: ls, pwd, whoami, date, echo, clear, git status, git log, npm run dev, npm run build, npm test" }];
-      case "ls":
-        return [{ type: "ok", text: "public/   src/   tests/   index.html   package.json   tsconfig.json   vite.config.ts   README.md" }];
-      case "pwd":
-        return [{ type: "ok", text: "/Users/ada/dev/taskflow" }];
-      case "whoami":
-        return [{ type: "ok", text: "ada" }];
-      case "date":
-        return [{ type: "ok", text: new Date().toString() }];
-      case "echo":
-        return [{ type: "ok", text: args.join(" ") }];
-      case "clear":
-        return [{ type: "out", text: "__clear__" }];
-      case "git":
-        if (args[0] === "status")
-          return [
-            { type: "ok", text: "On branch main" },
-            { type: "ok", text: "Your branch is ahead of 'origin/main' by 1 commit." },
-            { type: "out", text: "" },
-            { type: "out", text: "Changes not staged for commit:" },
-            { type: "err", text: "  modified:   src/App.tsx" },
-            { type: "err", text: "  modified:   src/utils/sort.ts" },
-            { type: "ok", text: "  added:      src/types.ts" },
-          ];
-        if (args[0] === "log")
-          return [
-            { type: "ok", text: "commit a4f2c91 (HEAD -> main)" },
-            { type: "out", text: "Author: Ada Lovelace <ada@taskflow.dev>" },
-            { type: "out", text: "    feat: persist tasks to localStorage" },
-          ];
-        return [{ type: "err", text: `git: '${args[0] ?? ""}' is not a git command. See 'git --help'.` }];
-      case "npm":
-        if (args[0] === "run" && args[1] === "dev")
-          return [
-            { type: "sys", text: "> taskflow@1.4.2 dev" },
-            { type: "sys", text: "> vite" },
-            { type: "out", text: "" },
-            { type: "ok", text: "  VITE v7.3.2  ready in 421 ms" },
-            { type: "out", text: "" },
-            { type: "link", text: "  ➜  Local:   http://localhost:5173/" },
-            { type: "link", text: "  ➜  Network: use --host to expose" },
-            { type: "out", text: "  ➜  press h + enter to show help" },
-          ];
-        if (args[0] === "run" && args[1] === "build")
-          return [
-            { type: "sys", text: "> taskflow@1.4.2 build" },
-            { type: "sys", text: "> tsc && vite build" },
-            { type: "ok", text: "  ✓ built dist/taskflow.js   (44.21 kB)" },
-            { type: "ok", text: "  ✓ built dist/style.css     (2.10 kB)" },
-            { type: "ok", text: "  ✓ built in 1.83s" },
-          ];
-        if (args[0] === "test")
-          return [
-            { type: "sys", text: "RUN  v2.1.0" },
-            { type: "ok", text: " ✓ sort.test.ts (2)" },
-            { type: "out", text: " Test Files  1 passed (1)" },
-            { type: "out", text: "      Tests  2 passed (2)" },
-            { type: "ok", text: " Duration  312ms" },
-          ];
-        return [{ type: "out", text: `npm ${args.join(" ")}` }];
-      case "node":
-      case "npx":
-        return [{ type: "out", text: `${name} ${args.join(" ")}` }];
-      default:
-        return [{ type: "err", text: `zsh: command not found: ${name}` }];
-    }
-  };
+  useEffect(() => {
+    const offData = window.ide?.onTerminalData?.((event) => {
+      if (event.id !== TERMINAL_ID) return;
+      setLines((prev) => [...prev, { type: event.type === "stderr" ? "err" : "out", text: event.text }]);
+    });
+    const offExit = window.ide?.onTerminalExit?.((event) => {
+      if (event.id !== TERMINAL_ID) return;
+      setRunning(false);
+      setLines((prev) => [...prev, { type: event.code === 0 ? "ok" : "err", text: `Process exited with code ${event.code ?? "unknown"}` }]);
+    });
+
+    return () => {
+      offData?.();
+      offExit?.();
+    };
+  }, []);
 
   const submit = () => {
-    const value = input;
-    const produced = run(value);
-    if (produced.length === 1 && produced[0].text === "__clear__") {
+    const value = input.trim();
+    if (!value) return;
+
+    if (value === "clear") {
       setLines([]);
     } else {
       const cmdLine: TermLine = { type: "cmd", text: value };
-      setLines((prev) => [...prev, cmdLine, ...produced]);
+      setLines((prev) => [...prev, cmdLine]);
+      setRunning(true);
+      void window.ide?.terminalRun?.(TERMINAL_ID, value, cwd).catch((error) => {
+        setRunning(false);
+        setLines((prev) => [...prev, { type: "err", text: String(error) }]);
+      });
     }
     if (value.trim()) setHistory((h) => [...h, value]);
     setHIdx(-1);
@@ -202,6 +146,11 @@ function TerminalView() {
     if (e.key === "Enter") {
       e.preventDefault();
       submit();
+    } else if (e.key.toLowerCase() === "c" && (e.ctrlKey || e.metaKey) && running) {
+      e.preventDefault();
+      void window.ide?.terminalStop?.(TERMINAL_ID);
+      setRunning(false);
+      setLines((prev) => [...prev, { type: "sys", text: "Process terminated" }]);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (history.length) {
@@ -234,7 +183,7 @@ function TerminalView() {
       {lines.map((l, i) =>
         l.type === "cmd" ? (
           <div key={i} className="whitespace-pre-wrap break-all">
-            {PROMPT} <span className={termColor.cmd}>{l.text}</span>
+            <Prompt cwd={cwd} /> <span className={termColor.cmd}>{l.text}</span>
           </div>
         ) : (
           <div key={i} className={cn("whitespace-pre-wrap break-all", termColor[l.type])}>
@@ -243,7 +192,8 @@ function TerminalView() {
         ),
       )}
       <div className="flex items-center">
-        <span className="shrink-0">{PROMPT}&nbsp;</span>
+        <span className="shrink-0"><Prompt cwd={cwd} />&nbsp;</span>
+        {running && <span className="mr-2 h-2 w-2 animate-pulse rounded-full bg-[#5fb96b]" />}
         <input
           ref={inputRef}
           autoFocus
@@ -260,42 +210,10 @@ function TerminalView() {
 }
 
 /* ----------------------------- Problems ----------------------------- */
-interface Problem {
-  sev: "error" | "warn" | "info";
-  fileId: string;
-  line: number;
-  col: number;
-  code: string;
-  msg: string;
-}
-
-const PROBLEMS: Problem[] = [
-  { sev: "error", fileId: "root/src/App.tsx", line: FILTERBAR_LINE, col: 6, code: "ts(2304)", msg: "Cannot find name 'FilterBar'." },
-  { sev: "warn", fileId: "root/src/hooks/useLocalStorage.ts", line: 13, col: 3, code: "react-hooks(6)", msg: "React Hook useEffect has a missing dependency: 'initial'." },
-  { sev: "info", fileId: "root/src/utils/sort.ts", line: 5, col: 3, code: "JSDoc", msg: "Missing JSDoc @returns tag." },
-];
-
-function ProblemsView({ onJump }: { onJump: (fileId: string, line: number) => void }) {
+function ProblemsView({ onJump: _onJump }: { onJump: (fileId: string, line: number) => void }) {
   return (
-    <div className="scroll-jb h-full overflow-auto py-1 font-mono-jb text-[12px]">
-      {PROBLEMS.map((p, i) => {
-        const file = FILE_MAP[p.fileId];
-        const dot = p.sev === "error" ? "bg-[#c7551b]" : p.sev === "warn" ? "bg-[#caa53a]" : "bg-[#5b87b5]";
-        return (
-          <button
-            key={i}
-            onClick={() => onJump(p.fileId, p.line)}
-            className="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-[#33363a]"
-          >
-            <span className={cn("mt-[5px] h-2.5 w-2.5 shrink-0 rounded-full", dot)} />
-            <span className="text-[#c8c8c8]">{p.msg}</span>
-            <span className="text-[#8b9094]">{p.code}</span>
-            <span className="ml-auto shrink-0 text-[#8b9094]">
-              {file?.name}:{p.line}:{p.col}
-            </span>
-          </button>
-        );
-      })}
+    <div className="scroll-jb flex h-full items-center justify-center overflow-auto py-1 font-mono-jb text-[12px] text-[#6f7377]">
+      No problems detected
     </div>
   );
 }

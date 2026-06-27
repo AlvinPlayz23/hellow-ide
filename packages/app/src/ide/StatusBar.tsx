@@ -8,13 +8,14 @@ interface Props {
   running: boolean;
   errors: number;
   warnings: number;
+  dirtyCount: number;
 }
 
 function Sep() {
   return <span className="mx-2 h-3 w-px bg-[#5a5d5f]/60" />;
 }
 
-export function StatusBar({ cursorLine, cursorCol, langLabel, running, errors, warnings }: Props) {
+export function StatusBar({ cursorLine, cursorCol, langLabel, running, errors, warnings, dirtyCount }: Props) {
   return (
     <div className="flex h-[22px] shrink-0 items-center bg-[#3c3f41] text-[11.5px] text-[#9aa0a4]">
       <div className="flex items-center gap-1.5 border-r border-black/30 px-2.5 text-[#dcdcdc]">
@@ -49,6 +50,12 @@ export function StatusBar({ cursorLine, cursorCol, langLabel, running, errors, w
         <Sep />
         <span>Spaces: 2</span>
         <Sep />
+        {dirtyCount > 0 && (
+          <>
+            <span className="text-[#8bb3dd]">{dirtyCount} unsaved</span>
+            <Sep />
+          </>
+        )}
         <span>{langLabel}</span>
         <Sep />
         <span>
