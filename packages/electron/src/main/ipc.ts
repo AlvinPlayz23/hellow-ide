@@ -1,11 +1,14 @@
 import { app, dialog, ipcMain } from 'electron';
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as pty from 'node-pty';
+import { promisify } from 'node:util';
 
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 const recentWorkspacesPath = () => path.join(app.getPath('userData'), 'recent-workspaces.json');
 const terminalProcesses = new Map<string, pty.IPty>();
+const execFileAsync = promisify(execFile);
 
 export interface DirEntry {
   name: string;
@@ -13,6 +16,28 @@ export interface DirEntry {
   type: 'file' | 'directory';
   size?: number;
   children?: DirEntry[];
+}
+
+async function getGitStatus(workspacePath: string) {
+  try {
+    const { stdout } = await execFileAsync('git', ['status', '--porcelain=v1', '-b'], { cwd: workspacePath, windowsHide: true });
+    const lines = stdout.split(/\r?\n/).filter(Boolean);
+    const branchLine = lines.find((line) => line.startsWith('## '));
+    const branch = branchLine?.slice(3).split('...')[0].trim() || 'main';
+    const files = lines.filter((line) => !line.startsWith('## ')).map((line) => {
+      const code = line.slice(0, 2);
+      const rawPath = line.slice(3).split(' -> ').pop() ?? '';
+      const absolutePath = path.join(workspacePath, rawPath);
+      const status = code.includes('?') ? 'untracked'
+        : code.includes('A') ? 'added'
+        : code.includes('D') ? 'deleted'
+        : 'modified';
+      return { path: absolutePath, status };
+    });
+    return { isRepo: true, branch, files };
+  } catch {
+    return { isRepo: false, branch: '', files: [] };
+  }
 }
 
 async function readRecentWorkspaces(): Promise<string[]> {
@@ -108,6 +133,7 @@ export function registerIpcHandlers() {
   });
   ipcMain.handle('get-recent-workspaces', () => readRecentWorkspaces());
   ipcMain.handle('add-recent-workspace', (_event, workspacePath: string) => addRecentWorkspace(workspacePath));
+  ipcMain.handle('git-status', (_event, workspacePath: string) => getGitStatus(workspacePath));
   ipcMain.handle('terminal-start', async (event, id: string, cwd?: string) => {
     const existing = terminalProcesses.get(id);
     if (existing) return;

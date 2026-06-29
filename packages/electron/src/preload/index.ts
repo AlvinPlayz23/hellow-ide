@@ -11,6 +11,7 @@ const ide = {
   deleteEntry: (path: string) => ipcRenderer.invoke('delete-entry', path) as Promise<void>,
   getRecentWorkspaces: () => ipcRenderer.invoke('get-recent-workspaces') as Promise<string[]>,
   addRecentWorkspace: (path: string) => ipcRenderer.invoke('add-recent-workspace', path) as Promise<void>,
+  gitStatus: (path: string) => ipcRenderer.invoke('git-status', path) as Promise<{ isRepo: boolean; branch: string; files: { path: string; status: 'modified' | 'added' | 'untracked' | 'deleted' }[] }>,
   terminalStart: (id: string, cwd?: string) => ipcRenderer.invoke('terminal-start', id, cwd) as Promise<void>,
   terminalWrite: (id: string, data: string) => ipcRenderer.invoke('terminal-write', id, data) as Promise<void>,
   terminalResize: (id: string, cols: number, rows: number) => ipcRenderer.invoke('terminal-resize', id, cols, rows) as Promise<void>,

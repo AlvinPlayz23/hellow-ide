@@ -8,7 +8,7 @@ function nodeHasChanges(node: TreeNode): boolean {
 }
 
 const vcsClass = (v?: VcsStatus) =>
-  v === "modified" ? "vcs-modified" : v === "added" ? "vcs-added" : v === "ignored" ? "vcs-ignored" : "";
+  v === "modified" ? "vcs-modified" : v === "added" || v === "untracked" ? "vcs-added" : v === "deleted" ? "text-[#c58b82]" : v === "ignored" ? "vcs-ignored" : "";
 
 interface RowProps {
   node: TreeNode;
@@ -114,8 +114,9 @@ export function FileTree({
   return (
     <div className="flex h-full flex-col bg-[#3c3f41]">
       {/* header */}
-      <div className="flex h-[26px] shrink-0 items-center px-2 text-[11px] font-semibold uppercase tracking-wide text-[#9aa0a4]">
-        <span>Project</span>
+      <div className="flex h-[26px] shrink-0 items-center gap-1.5 px-2 text-[12px] text-[#dcdcdc]">
+        <Folder className="h-3.5 w-3.5 shrink-0 text-[#9aa0a4]" />
+        <span className="truncate font-medium" title={root.id}>{root.name}</span>
         <div className="flex-1" />
         <button onClick={onOpenFolder} title="Open Folder" className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
           <Search className="h-3.5 w-3.5" />
@@ -123,13 +124,6 @@ export function FileTree({
         <button onClick={onRefresh} title="Refresh Project" className="grid h-5 w-5 place-items-center rounded text-[#9aa0a4] hover:bg-[#464a4d]">
           <Sync className="h-3.5 w-3.5" />
         </button>
-      </div>
-
-      {/* project selector row */}
-      <div className="flex items-center gap-1.5 px-2 py-1 text-[12.5px] text-[#dcdcdc]">
-        <Folder className="h-4 w-4 shrink-0" />
-        <span className="truncate font-medium" title={root.id}>{root.name}</span>
-        <ChevronDown className="h-3 w-3 text-[#9aa0a4]" />
       </div>
 
       <div className="flex h-[26px] shrink-0 items-center gap-1 border-y border-black/25 px-2 text-[11.5px] text-[#b9bec3]">

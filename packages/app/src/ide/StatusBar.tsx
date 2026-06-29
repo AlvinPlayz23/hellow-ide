@@ -9,20 +9,22 @@ interface Props {
   errors: number;
   warnings: number;
   dirtyCount: number;
+  gitBranch: string;
+  gitChanged: number;
 }
 
 function Sep() {
   return <span className="mx-2 h-3 w-px bg-[#5a5d5f]/60" />;
 }
 
-export function StatusBar({ cursorLine, cursorCol, langLabel, running, errors, warnings, dirtyCount }: Props) {
+export function StatusBar({ cursorLine, cursorCol, langLabel, running, errors, warnings, dirtyCount, gitBranch, gitChanged }: Props) {
   return (
     <div className="flex h-[22px] shrink-0 items-center bg-[#3c3f41] text-[11.5px] text-[#9aa0a4]">
       <div className="flex items-center gap-1.5 border-r border-black/30 px-2.5 text-[#dcdcdc]">
         <GitBranch className="h-3.5 w-3.5 text-[#9aa0a4]" />
-        <span className="font-medium">main</span>
+        <span className="font-medium">{gitBranch}</span>
         <ArrowUp className="h-3 w-3 text-[#7fd17f]" />
-        <span className="text-[#7fd17f]">1</span>
+        <span className="text-[#7fd17f]">{gitChanged}</span>
         <ArrowDown className="h-3 w-3 text-[#cf9c6e]" />
         <span className="text-[#cf9c6e]">0</span>
       </div>

@@ -15,6 +15,7 @@ type MenuAction =
   | 'toggle-terminal'
   | 'toggle-problems'
   | 'run'
+  | 'build'
   | 'stop';
 
 function sendAction(action: MenuAction) {
@@ -105,7 +106,7 @@ export function createApplicationMenu() {
     {
       label: 'Build',
       submenu: [
-        { label: 'Build Project', accelerator: 'F9', click: () => sendAction('run') },
+        { label: 'Build Project', accelerator: 'F9', click: () => sendAction('build') },
         { label: 'Recompile Current File', accelerator: 'CmdOrCtrl+Shift+F9' }
       ]
     },

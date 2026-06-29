@@ -391,7 +391,7 @@ Root `package.json`:
 
 ## Revised Implementation Phases
 
-The UI shell has evolved into a richer JetBrains-style environment, so the build order is now organized around turning that shell into a real IDE while keeping the current mock project as a demo/fallback state.
+The UI shell has evolved into a richer JetBrains-style environment, so the build order is now organized around turning that shell into a real IDE backed by opened workspaces and real local tooling.
 
 ### Phase 1 — IDE Shell Behavior
 
@@ -453,8 +453,10 @@ The UI shell has evolved into a richer JetBrains-style environment, so the build
 - [x] Persistent PTY shell with streamed output and Ctrl+C support
 - [x] Problems model independent of mock data
 - [ ] Jump from problem to file/line
-- [ ] Run configurations
-- [ ] Build/test task output
+- [x] Detect workspace package scripts and package manager
+- [x] Run configurations from package.json scripts
+- [x] Build/test task output streams into the real PTY terminal
+- [x] Toolbar and menu run/build actions dispatch real terminal tasks
 - [x] Status bar indicators sourced from real workspace/editor state
 - [ ] Basic VCS status detection
 

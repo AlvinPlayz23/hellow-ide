@@ -150,12 +150,12 @@ function TabBar({
 }
 
 function Breadcrumb({ file }: { file: FileNode }) {
-  const segs = file.id.split("/").slice(1);
+  const segs = file.id.split(/[\\/]/).filter(Boolean).slice(1);
   const symbol = getStructure(file.content)[0]?.name;
   return (
     <div className="flex h-[24px] shrink-0 items-center gap-1 border-b border-black/30 bg-[#323232] px-3 text-[12px] text-[#9aa0a4]">
       <FolderOpen className="h-3.5 w-3.5 text-[#c9a45c]" />
-      <span className="text-[#c8c8c8]">taskflow</span>
+      <span className="text-[#c8c8c8]">workspace</span>
       {segs.map((s, i) => {
         const last = i === segs.length - 1;
         return (

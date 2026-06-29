@@ -1,4 +1,4 @@
-export type VcsStatus = "modified" | "added" | "untracked" | "ignored";
+export type VcsStatus = "modified" | "added" | "untracked" | "deleted" | "ignored";
 
 export interface FileNode {
   type: "file";

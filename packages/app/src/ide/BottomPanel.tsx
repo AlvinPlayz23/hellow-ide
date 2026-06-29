@@ -12,6 +12,20 @@ interface Props {
   errors: number;
   warnings: number;
   cwd?: string;
+  problems: ProblemItem[];
+  commandRequest?: { id: number; command: string } | null;
+  onCommandStarted?: () => void;
+  onCommandStopped?: () => void;
+  onTerminalOutput?: (text: string) => void;
+}
+
+interface ProblemItem {
+  id: string;
+  fileId: string;
+  line: number;
+  col: number;
+  severity: "error" | "warning";
+  message: string;
 }
 
 const TABS: { id: BottomTab; label: string; icon: typeof Terminal }[] = [
@@ -20,7 +34,7 @@ const TABS: { id: BottomTab; label: string; icon: typeof Terminal }[] = [
 ];
 
 export function BottomPanel(props: Props) {
-  const { tab, onTab, onClose, onJump, errors, warnings, cwd } = props;
+  const { tab, onTab, onClose, onJump, errors, warnings, cwd, problems, commandRequest, onCommandStarted, onCommandStopped, onTerminalOutput } = props;
   return (
     <div className="flex h-[208px] shrink-0 flex-col border-t border-black/40 bg-[#2b2b2b]">
       <div className="flex h-[26px] items-center bg-[#3c3f41] pr-1 text-[12px]">
@@ -58,8 +72,8 @@ export function BottomPanel(props: Props) {
       </div>
 
       <div className="min-h-0 flex-1">
-        {tab === "terminal" && <TerminalView cwd={cwd} />}
-        {tab === "problems" && <ProblemsView onJump={onJump} />}
+        {tab === "terminal" && <TerminalView cwd={cwd} commandRequest={commandRequest} onCommandStarted={onCommandStarted} onCommandStopped={onCommandStopped} onTerminalOutput={onTerminalOutput} />}
+        {tab === "problems" && <ProblemsView problems={problems} onJump={onJump} />}
       </div>
     </div>
   );
@@ -93,7 +107,7 @@ function Prompt({ cwd }: { cwd?: string }) {
   );
 }
 
-function TerminalView({ cwd }: { cwd?: string }) {
+function TerminalView({ cwd, commandRequest, onCommandStarted, onCommandStopped, onTerminalOutput }: { cwd?: string; commandRequest?: { id: number; command: string } | null; onCommandStarted?: () => void; onCommandStopped?: () => void; onTerminalOutput?: (text: string) => void }) {
   const [lines, setLines] = useState<TermLine[]>([
     { type: "sys", text: "Hellow Terminal — PTY shell" },
   ]);
@@ -113,11 +127,13 @@ function TerminalView({ cwd }: { cwd?: string }) {
       if (event.id !== TERMINAL_ID) return;
       const text = stripAnsi(event.text).replace(/\r/g, "");
       if (!text) return;
+      onTerminalOutput?.(text);
       setLines((prev) => [...prev, { type: event.type === "stderr" ? "err" : "out", text }]);
     });
     const offExit = window.ide?.onTerminalExit?.((event) => {
       if (event.id !== TERMINAL_ID) return;
       setRunning(false);
+      onCommandStopped?.();
       setLines((prev) => [...prev, { type: event.code === 0 ? "ok" : "err", text: `Process exited with code ${event.code ?? "unknown"}` }]);
     });
 
@@ -125,16 +141,19 @@ function TerminalView({ cwd }: { cwd?: string }) {
       offData?.();
       offExit?.();
     };
-  }, []);
+  }, [onCommandStopped, onTerminalOutput]);
 
   useEffect(() => {
     setRunning(true);
     setLines((prev) => [...prev, { type: "sys", text: cwd ? `Terminal cwd: ${cwd}` : "Terminal cwd: application workspace" }]);
     void window.ide?.terminalStop?.(TERMINAL_ID).finally(() => {
-      void window.ide?.terminalStart?.(TERMINAL_ID, cwd).catch((error) => {
-        setRunning(false);
-        setLines((prev) => [...prev, { type: "err", text: String(error) }]);
-      });
+      void window.ide?.terminalStart?.(TERMINAL_ID, cwd).then(
+        () => setRunning(false),
+        (error) => {
+          setRunning(false);
+          setLines((prev) => [...prev, { type: "err", text: String(error) }]);
+        },
+      );
     });
   }, [cwd]);
 
@@ -146,8 +165,11 @@ function TerminalView({ cwd }: { cwd?: string }) {
       setLines([]);
     } else {
       setLines((prev) => [...prev, { type: "cmd", text: value }]);
+      setRunning(true);
+      onCommandStarted?.();
       void window.ide?.terminalRun?.(TERMINAL_ID, value).catch((error) => {
         setRunning(false);
+        onCommandStopped?.();
         setLines((prev) => [...prev, { type: "err", text: String(error) }]);
       });
     }
@@ -155,6 +177,24 @@ function TerminalView({ cwd }: { cwd?: string }) {
     setHIdx(-1);
     setInput("");
   };
+
+  useEffect(() => {
+    const value = commandRequest?.command.trim();
+    if (!value) return;
+    if (value === "clear") {
+      setLines([]);
+      return;
+    }
+    setLines((prev) => [...prev, { type: "cmd", text: value }]);
+    setHistory((h) => [...h, value]);
+    setRunning(true);
+    onCommandStarted?.();
+    void window.ide?.terminalRun?.(TERMINAL_ID, value).catch((error) => {
+      setRunning(false);
+      onCommandStopped?.();
+      setLines((prev) => [...prev, { type: "err", text: String(error) }]);
+    });
+  }, [commandRequest, onCommandStarted, onCommandStopped]);
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -222,7 +262,25 @@ function TerminalView({ cwd }: { cwd?: string }) {
 }
 
 /* ----------------------------- Problems ----------------------------- */
-function ProblemsView({ onJump: _onJump }: { onJump: (fileId: string, line: number) => void }) {
+function ProblemsView({ problems, onJump }: { problems: ProblemItem[]; onJump: (fileId: string, line: number) => void }) {
+  if (problems.length > 0) {
+    return (
+      <div className="scroll-jb h-full overflow-auto py-1 font-mono-jb text-[12px]">
+        {problems.map((problem) => (
+          <button
+            key={problem.id}
+            onClick={() => onJump(problem.fileId, problem.line)}
+            className="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-[#3a3d3f]"
+          >
+            <span className={problem.severity === "error" ? "text-[#e08a7a]" : "text-[#d6c770]"}>{problem.severity}</span>
+            <span className="text-[#5fa6c9]">{problem.fileId.split(/[\\/]/).pop()}:{problem.line}:{problem.col}</span>
+            <span className="text-[#b8b8b8]">{problem.message}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="scroll-jb flex h-full items-center justify-center overflow-auto py-1 font-mono-jb text-[12px] text-[#6f7377]">
       No problems detected

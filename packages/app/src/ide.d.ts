@@ -16,6 +16,7 @@ interface IdeApi {
   deleteEntry: (path: string) => Promise<void>;
   getRecentWorkspaces: () => Promise<string[]>;
   addRecentWorkspace: (path: string) => Promise<void>;
+  gitStatus: (path: string) => Promise<{ isRepo: boolean; branch: string; files: { path: string; status: "modified" | "added" | "untracked" | "deleted" }[] }>;
   terminalStart: (id: string, cwd?: string) => Promise<void>;
   terminalWrite: (id: string, data: string) => Promise<void>;
   terminalResize: (id: string, cols: number, rows: number) => Promise<void>;

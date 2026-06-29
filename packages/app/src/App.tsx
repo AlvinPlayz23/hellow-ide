@@ -9,7 +9,7 @@ import { CommandPalette } from "./ide/CommandPalette";
 import { InputModal, ConfirmModal, UnsavedChangesModal } from "./ide/InputModal";
 import { ToolStrip, type StripItem } from "./ide/ToolStrip";
 import { Cube, Commit, Bookmark, Sparkles, Folder } from "./ide/icons";
-import { flattenFiles, type DirNode, type FileNode, type TreeNode } from "./ide/projectData";
+import { flattenFiles, type DirNode, type FileNode, type TreeNode, type VcsStatus } from "./ide/projectData";
 
 const LS_PREFIX = "hellow:";
 
@@ -35,6 +35,28 @@ interface DirEntry {
 }
 
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
+
+type PackageManager = "pnpm" | "npm" | "yarn";
+
+interface WorkspaceScripts {
+  manager: PackageManager;
+  scripts: Record<string, string>;
+}
+
+interface GitState {
+  isRepo: boolean;
+  branch: string;
+  changed: number;
+}
+
+interface ProblemItem {
+  id: string;
+  fileId: string;
+  line: number;
+  col: number;
+  severity: "error" | "warning";
+  message: string;
+}
 
 const LANG_LABEL: Record<string, string> = {
   tsx: "TypeScript JSX",
@@ -81,6 +103,20 @@ function parentPathOf(id: string) {
 function joinPath(base: string, name: string) {
   const separator = base.includes("\\") ? "\\" : "/";
   return `${base.replace(/[\\/]$/, "")}${separator}${name}`;
+}
+
+function packageRunCommand(manager: PackageManager, script: string) {
+  if (manager === "yarn") return `yarn ${script}`;
+  return `${manager} run ${script}`;
+}
+
+function normalizePath(value: string) {
+  return value.replace(/\\/g, "/").toLowerCase();
+}
+
+function applyVcsStatus(node: TreeNode, statuses: Map<string, VcsStatus>): TreeNode {
+  if (node.type === "file") return { ...node, vcs: statuses.get(normalizePath(node.id)) };
+  return { ...node, children: node.children.map((child) => applyVcsStatus(child, statuses)) };
 }
 
 function findTreeNode(node: TreeNode, id: string): TreeNode | null {
@@ -179,6 +215,11 @@ export default function App() {
   const [workspaceRoot, setWorkspaceRoot] = useState<DirNode | null>(null);
   const [fileMap, setFileMap] = useState<Record<string, FileNode>>({});
   const [recentWorkspaces, setRecentWorkspaces] = useState<string[]>([]);
+  const [workspaceScripts, setWorkspaceScripts] = useState<WorkspaceScripts | null>(null);
+  const [selectedRunScript, setSelectedRunScript] = useState("");
+  const [gitState, setGitState] = useState<GitState>({ isRepo: false, branch: "", changed: 0 });
+  const [problems, setProblems] = useState<ProblemItem[]>([]);
+  const [terminalCommand, setTerminalCommand] = useState<{ id: number; command: string } | null>(null);
   const toastTimer = useRef<number | null>(null);
   const shiftTapTimer = useRef<number | null>(null);
 
@@ -192,6 +233,14 @@ export default function App() {
   const isRealWorkspace = workspaceRoot !== null;
   const dirtyFiles = useMemo(() => Object.values(fileMap).filter((file) => file.dirty), [fileMap]);
   const dirtyCount = dirtyFiles.length;
+  const preferredRunScript = useMemo(() => {
+    const scripts = workspaceScripts?.scripts;
+    if (!scripts) return "";
+    if (selectedRunScript && scripts[selectedRunScript]) return selectedRunScript;
+    return ["dev", "start", "serve", "preview"].find((script) => scripts[script]) ?? Object.keys(scripts)[0] ?? "";
+  }, [selectedRunScript, workspaceScripts]);
+  const runLabel = preferredRunScript ? `${workspaceScripts?.manager} ${preferredRunScript}` : "No Run Config";
+  const runOptions = useMemo(() => Object.keys(workspaceScripts?.scripts ?? {}), [workspaceScripts]);
 
   const announce = useCallback((message: string) => {
     setActionToast(message);
@@ -358,11 +407,55 @@ export default function App() {
     });
   }, []);
 
+  const detectWorkspaceScripts = useCallback(async (folder: string, files: Record<string, FileNode>) => {
+    const packageJsonPath = joinPath(folder, "package.json");
+    if (!files[packageJsonPath]) {
+      setWorkspaceScripts(null);
+      return;
+    }
+
+    let manager: PackageManager = "npm";
+    if (files[joinPath(folder, "pnpm-lock.yaml")]) manager = "pnpm";
+    else if (files[joinPath(folder, "yarn.lock")]) manager = "yarn";
+
+    try {
+      const raw = await window.ide?.readFile?.(packageJsonPath);
+      const parsed = raw ? JSON.parse(raw) as { scripts?: unknown } : null;
+      const scripts = parsed?.scripts && typeof parsed.scripts === "object" ? parsed.scripts as Record<string, unknown> : {};
+      const stringScripts = Object.fromEntries(Object.entries(scripts).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+      const names = Object.keys(stringScripts);
+      setWorkspaceScripts(names.length ? { manager, scripts: stringScripts } : null);
+      setSelectedRunScript((current) => current && stringScripts[current] ? current : ["dev", "start", "serve", "preview"].find((script) => stringScripts[script]) ?? names[0] ?? "");
+    } catch {
+      setWorkspaceScripts(null);
+      setSelectedRunScript("");
+    }
+  }, []);
+
+  const refreshGitStatus = useCallback(async (folder: string, root: DirNode, files: Record<string, FileNode>) => {
+    const status = await window.ide?.gitStatus?.(folder);
+    if (!status?.isRepo) {
+      setGitState({ isRepo: false, branch: "", changed: 0 });
+      return { root, files };
+    }
+
+    const statuses = new Map<string, VcsStatus>();
+    for (const file of status.files) {
+      if (file.status !== "deleted") statuses.set(normalizePath(file.path), file.status);
+    }
+    const nextRoot = applyVcsStatus(root, statuses) as DirNode;
+    const nextFiles = flattenFiles(nextRoot);
+    setGitState({ isRepo: true, branch: status.branch, changed: status.files.length });
+    return { root: nextRoot, files: nextFiles };
+  }, []);
+
   const loadWorkspace = useCallback(async (folder: string) => {
     const entries = await window.ide?.readDir?.(folder);
     if (!entries) throw new Error("No directory entries returned");
-    const root = workspaceTreeFromEntries(folder, entries);
-    const nextFileMap = flattenFiles(root);
+    let root = workspaceTreeFromEntries(folder, entries);
+    let nextFileMap = flattenFiles(root);
+    void detectWorkspaceScripts(folder, nextFileMap);
+    ({ root, files: nextFileMap } = await refreshGitStatus(folder, root, nextFileMap));
     setWorkspaceRoot(root);
     setFileMap((current) => {
       const merged = { ...nextFileMap };
@@ -377,7 +470,7 @@ export default function App() {
     setActiveId((current) => current && nextFileMap[current] ? current : "");
     await window.ide?.addRecentWorkspace?.(folder);
     refreshRecentWorkspaces();
-  }, [refreshRecentWorkspaces]);
+  }, [detectWorkspaceScripts, refreshGitStatus, refreshRecentWorkspaces]);
 
   const openFolderAction = useCallback(async () => {
     const folder = await window.ide?.openFolder?.();
@@ -593,15 +686,65 @@ export default function App() {
     setBottomOpen(true);
   }, [openFile]);
 
-  const run = useCallback(() => {
-    setRunning(true);
+  const runTerminalCommand = useCallback((command: string, label: string) => {
     setBottomOpen(true);
     setBottomTab("terminal");
-    announce("Running active file");
+    setProblems([]);
+    setTerminalCommand({ id: Date.now(), command });
+    setRunning(true);
+    announce(label);
   }, [announce]);
+
+  const runScript = useCallback((script: string) => {
+    if (!workspaceScripts?.scripts[script]) {
+      announce(script === "build" ? "No build script found" : "No run configuration found");
+      return;
+    }
+    runTerminalCommand(packageRunCommand(workspaceScripts.manager, script), `Running ${script}`);
+  }, [announce, runTerminalCommand, workspaceScripts]);
+
+  const run = useCallback(() => {
+    if (!preferredRunScript) {
+      announce("No run configuration found");
+      return;
+    }
+    runScript(preferredRunScript);
+  }, [announce, preferredRunScript, runScript]);
+
+  const build = useCallback(() => {
+    runScript("build");
+  }, [runScript]);
+
+  const captureTerminalProblems = useCallback((text: string) => {
+    if (!workspaceRoot) return;
+    const next: ProblemItem[] = [];
+    const patterns = [
+      /([^\s()]+\.(?:ts|tsx|js|jsx|css|json))\((\d+),(\d+)\):\s*(error|warning)\s*[^:]*:\s*(.+)/gi,
+      /([^\s:()]+\.(?:ts|tsx|js|jsx|css|json)):(\d+):(\d+):\s*(error|warning)?\s*(.+)/gi,
+    ];
+    for (const pattern of patterns) {
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(text))) {
+        const rawPath = match[1];
+        const fileId = rawPath.includes(":") || rawPath.startsWith("/") || rawPath.startsWith("\\") ? rawPath : joinPath(workspaceRoot.id, rawPath);
+        next.push({
+          id: `${fileId}:${match[2]}:${match[3]}:${match[5]}`,
+          fileId,
+          line: Number(match[2]),
+          col: Number(match[3]),
+          severity: match[4]?.toLowerCase() === "warning" ? "warning" : "error",
+          message: match[5].trim(),
+        });
+      }
+    }
+    if (next.length) {
+      setProblems((current) => [...current.filter((item) => !next.some((incoming) => incoming.id === item.id)), ...next]);
+    }
+  }, [workspaceRoot]);
 
   const stop = useCallback(() => {
     setRunning(false);
+    void window.ide?.terminalWrite?.("main", "\x03");
     announce("Stopped");
   }, [announce]);
 
@@ -636,9 +779,16 @@ export default function App() {
       { id: "toggle-problems", label: "Toggle Problems", shortcut: "Ctrl+6", action: () => { closeCommandPalette(); toggleBottom("problems"); } },
       { id: "next-tab", label: "Next Tab", shortcut: "Ctrl+E", action: () => { closeCommandPalette(); activateRelativeTab(1); } },
       { id: "prev-tab", label: "Previous Tab", shortcut: "Ctrl+Shift+E", action: () => { closeCommandPalette(); activateRelativeTab(-1); } },
-      { id: "run", label: "Run Active File", shortcut: "Ctrl+R", action: () => { closeCommandPalette(); run(); } },
+      { id: "run", label: preferredRunScript ? `Run: ${preferredRunScript}` : "Run", shortcut: "Ctrl+R", action: () => { closeCommandPalette(); run(); } },
+      { id: "build", label: "Build Project", shortcut: "F9", action: () => { closeCommandPalette(); build(); } },
       { id: "stop", label: "Stop", shortcut: "Ctrl+F2", action: () => { closeCommandPalette(); stop(); } },
       { id: "refresh-project", label: "Refresh Project", action: () => { closeCommandPalette(); void refreshWorkspace(); } },
+      ...Object.keys(workspaceScripts?.scripts ?? {}).map((script) => ({
+        id: `script-${script}`,
+        label: `Run Script: ${script}`,
+        shortcut: ["dev", "start", "build", "test", "lint"].includes(script) ? workspaceScripts?.scripts[script] : undefined,
+        action: () => { closeCommandPalette(); runScript(script); },
+      })),
       ...recentWorkspaces.map((workspacePath) => ({
         id: `recent-${workspacePath}`,
         label: `Open Recent: ${workspacePath.split(/[\\/]/).filter(Boolean).pop() ?? workspacePath}`,
@@ -647,7 +797,7 @@ export default function App() {
       })),
     ];
     return items;
-  }, [activateRelativeTab, closeActiveTab, closeCommandPalette, createFileAction, createFolderAction, openFolderAction, openRecentWorkspace, recentWorkspaces, refreshWorkspace, reloadActiveFileFromDisk, run, saveActiveFile, saveAllFiles, stop, toggleBottom]);
+  }, [activateRelativeTab, build, closeActiveTab, closeCommandPalette, createFileAction, createFolderAction, openFolderAction, openRecentWorkspace, preferredRunScript, recentWorkspaces, refreshWorkspace, reloadActiveFileFromDisk, run, runScript, saveActiveFile, saveAllFiles, stop, toggleBottom, workspaceScripts]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -689,6 +839,7 @@ export default function App() {
         "Ctrl+Shift+E": () => activateRelativeTab(-1),
         "Ctrl+R": run,
         "Ctrl+D": run,
+        "F9": build,
         "Ctrl+F2": stop,
         "Escape": () => setActionToast(null),
       };
@@ -701,7 +852,7 @@ export default function App() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activateRelativeTab, closeActiveTab, openCommandPalette, openFolderAction, createFileAction, reloadActiveFileFromDisk, run, saveActiveFile, saveAllFiles, stop, toggleBottom, commandPaletteOpen]);
+  }, [activateRelativeTab, build, closeActiveTab, openCommandPalette, openFolderAction, createFileAction, reloadActiveFileFromDisk, run, saveActiveFile, saveAllFiles, stop, toggleBottom, commandPaletteOpen]);
 
   useEffect(() => {
     return window.ide?.onMenuAction?.((action) => {
@@ -746,18 +897,15 @@ export default function App() {
         case "run":
           run();
           break;
+        case "build":
+          build();
+          break;
         case "stop":
           stop();
           break;
       }
     });
-  }, [closeActiveTab, createFileAction, createFolderAction, openFind, openFolderAction, reloadActiveFileFromDisk, run, saveActiveFile, saveAllFiles, stop, toggleBottom]);
-
-  useEffect(() => {
-    if (!running) return;
-    const timer = window.setTimeout(() => setRunning(false), 1800);
-    return () => window.clearTimeout(timer);
-  }, [running]);
+  }, [build, closeActiveTab, createFileAction, createFolderAction, openFind, openFolderAction, reloadActiveFileFromDisk, run, saveActiveFile, saveAllFiles, stop, toggleBottom]);
 
   useEffect(() => {
     if (cursorLine < 1) setCursorLine(1);
@@ -782,7 +930,12 @@ export default function App() {
     <div className="flex h-screen w-screen select-none flex-col overflow-hidden bg-[#2b2b2b] text-[#c8c8c8]">
       <Toolbar
         running={running}
+        runLabel={runLabel}
+        runOptions={runOptions}
+        selectedRunScript={preferredRunScript}
+        onSelectRunScript={setSelectedRunScript}
         onRun={run}
+        onBuild={build}
         onStop={stop}
         onFind={openFind}
         onOpenFolder={() => void openFolderAction()}
@@ -850,9 +1003,14 @@ export default function App() {
               onTab={setBottomTab}
               onClose={() => setBottomOpen(false)}
               onJump={jumpTo}
-              errors={0}
-              warnings={0}
+              errors={problems.filter((problem) => problem.severity === "error").length}
+              warnings={problems.filter((problem) => problem.severity === "warning").length}
               cwd={workspaceRoot?.id}
+              problems={problems}
+              commandRequest={terminalCommand}
+              onCommandStarted={() => setRunning(true)}
+              onCommandStopped={() => setRunning(false)}
+              onTerminalOutput={captureTerminalProblems}
             />
           )}
         </div>
@@ -867,9 +1025,11 @@ export default function App() {
         cursorCol={cursorCol}
         langLabel={activeFile ? `${LANG_LABEL[activeFile.lang] ?? "Text"}${activeFile.dirty ? " • Modified" : ""}` : "—"}
         running={running}
-        errors={0}
-        warnings={0}
+        errors={problems.filter((problem) => problem.severity === "error").length}
+        warnings={problems.filter((problem) => problem.severity === "warning").length}
         dirtyCount={dirtyCount}
+        gitBranch={gitState.isRepo ? gitState.branch : "No Git"}
+        gitChanged={gitState.changed}
       />
 
       {commandPaletteOpen && (
